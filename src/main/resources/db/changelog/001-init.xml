@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- USERS -->
+    <changeSet id="001-create-bot-users" author="expensebot">
+        <createTable tableName="bot_users">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="telegram_id" type="BIGINT">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="username" type="VARCHAR(255)"/>
+            <column name="first_name" type="VARCHAR(255)"/>
+            <column name="state" type="VARCHAR(100)" defaultValue="IDLE"/>
+            <column name="state_data" type="TEXT"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()"/>
+        </createTable>
+        <createIndex tableName="bot_users" indexName="idx_bot_users_telegram_id">
+            <column name="telegram_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ACCOUNTS -->
+    <changeSet id="002-create-accounts" author="expensebot">
+        <createTable tableName="accounts">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_accounts_user"
+                             references="bot_users(id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="name" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="emoji" type="VARCHAR(10)" defaultValue="💳"/>
+            <column name="currency" type="VARCHAR(10)" defaultValue="RUB"/>
+            <column name="balance" type="DECIMAL(15,2)" defaultValueNumeric="0"/>
+            <column name="is_default" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()"/>
+        </createTable>
+    </changeSet>
+
+    <!-- CATEGORIES -->
+    <changeSet id="003-create-categories" author="expensebot">
+        <createTable tableName="categories">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_categories_user"
+                             references="bot_users(id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="name" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="emoji" type="VARCHAR(10)" defaultValue="📂"/>
+            <column name="type" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_system" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()"/>
+        </createTable>
+    </changeSet>
+
+    <!-- TRANSACTIONS -->
+    <changeSet id="004-create-transactions" author="expensebot">
+        <createTable tableName="transactions">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_tx_user"
+                             references="bot_users(id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="account_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_tx_account"
+                             references="accounts(id)"/>
+            </column>
+            <column name="category_id" type="BIGINT">
+                <constraints foreignKeyName="fk_tx_category"
+                             references="categories(id)"/>
+            </column>
+            <column name="amount" type="DECIMAL(15,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="type" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="note" type="VARCHAR(500)"/>
+            <column name="transaction_date" type="TIMESTAMP" defaultValueComputed="NOW()"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()"/>
+        </createTable>
+        <createIndex tableName="transactions" indexName="idx_tx_user_date">
+            <column name="user_id"/>
+            <column name="transaction_date"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- BUDGETS -->
+    <changeSet id="005-create-budgets" author="expensebot">
+        <createTable tableName="budgets">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true"/>
+            </column>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_budget_user"
+                             references="bot_users(id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="name" type="VARCHAR(100)"/>
+            <column name="amount" type="DECIMAL(15,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="period_year" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="period_month" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="all_categories" type="BOOLEAN" defaultValueBoolean="true"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()"/>
+        </createTable>
+    </changeSet>
+
+    <!-- BUDGET_CATEGORIES (many-to-many) -->
+    <changeSet id="006-create-budget-categories" author="expensebot">
+        <createTable tableName="budget_categories">
+            <column name="budget_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_bc_budget"
+                             references="budgets(id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="category_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_bc_category"
+                             references="categories(id)"
+                             deleteCascade="true"/>
+            </column>
+        </createTable>
+        <addPrimaryKey tableName="budget_categories"
+                       columnNames="budget_id,category_id"
+                       constraintName="pk_budget_categories"/>
+    </changeSet>
+</databaseChangeLog>
