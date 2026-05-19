@@ -104,6 +104,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     List<Transaction> findByUserIdOrderByTransactionDateDesc(Long userId);
 
+    void deleteByAccountId(Long accountId);
+
     @Query("""
         SELECT t FROM Transaction t
         LEFT JOIN FETCH t.category

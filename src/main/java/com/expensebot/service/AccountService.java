@@ -15,6 +15,7 @@ public class AccountService {
 
     private final AccountRepository accountRepo;
     private final BotUserRepository userRepo;
+    private final TransactionRepository transactionRepo;
 
     public List<Account> getAccounts(Long userId) {
         return accountRepo.findByUserIdOrderByIsDefaultDescCreatedAtAsc(userId);
@@ -27,14 +28,13 @@ public class AccountService {
         return accountRepo.save(Account.builder()
                 .user(user).name(name).emoji(emoji)
                 .currency(currency)
-                .balance(BigDecimal.ZERO)   // явно задаём ZERO
+                .balance(BigDecimal.ZERO)
                 .isDefault(isFirst).build());
     }
 
     @Transactional
     public void adjustBalance(Long accountId, BigDecimal delta) {
         accountRepo.findById(accountId).ifPresent(a -> {
-            // защита от null: если balance вдруг null — считаем его нулём
             BigDecimal current = a.getBalance() != null ? a.getBalance() : BigDecimal.ZERO;
             a.setBalance(current.add(delta));
         });
@@ -57,6 +57,8 @@ public class AccountService {
 
     @Transactional
     public void delete(Long accountId) {
+        // Сначала удаляем все транзакции счёта, иначе FK-constraint не даст удалить счёт
+        transactionRepo.deleteByAccountId(accountId);
         accountRepo.deleteById(accountId);
     }
 }
