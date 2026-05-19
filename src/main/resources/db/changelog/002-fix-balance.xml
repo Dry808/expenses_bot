@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Обнуляем все null-балансы и ставим NOT NULL + default -->
+    <changeSet id="007-fix-account-balance-null" author="expensebot">
+        <update tableName="accounts">
+            <column name="balance" valueNumeric="0"/>
+            <where>balance IS NULL</where>
+        </update>
+        <addNotNullConstraint
+                tableName="accounts"
+                columnName="balance"
+                defaultNullValue="0"/>
+        <addDefaultValue
+                tableName="accounts"
+                columnName="balance"
+                defaultValueNumeric="0"/>
+    </changeSet>
+
+</databaseChangeLog>

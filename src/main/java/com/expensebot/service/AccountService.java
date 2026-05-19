@@ -26,13 +26,17 @@ public class AccountService {
         boolean isFirst = accountRepo.countByUserId(userId) == 0;
         return accountRepo.save(Account.builder()
                 .user(user).name(name).emoji(emoji)
-                .currency(currency).isDefault(isFirst).build());
+                .currency(currency)
+                .balance(BigDecimal.ZERO)   // явно задаём ZERO
+                .isDefault(isFirst).build());
     }
 
     @Transactional
     public void adjustBalance(Long accountId, BigDecimal delta) {
         accountRepo.findById(accountId).ifPresent(a -> {
-            a.setBalance(a.getBalance().add(delta));
+            // защита от null: если balance вдруг null — считаем его нулём
+            BigDecimal current = a.getBalance() != null ? a.getBalance() : BigDecimal.ZERO;
+            a.setBalance(current.add(delta));
         });
     }
 
