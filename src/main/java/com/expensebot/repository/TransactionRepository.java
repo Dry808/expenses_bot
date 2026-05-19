@@ -1,6 +1,5 @@
 package com.expensebot.repository;
 
-
 import com.expensebot.model.Transaction;
 import com.expensebot.model.TransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,8 +12,18 @@ import java.util.List;
 
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
 
+    @Query("""
+        SELECT t FROM Transaction t
+        LEFT JOIN FETCH t.category
+        LEFT JOIN FETCH t.account
+        WHERE t.user.id = :userId
+          AND t.transactionDate BETWEEN :from AND :to
+        ORDER BY t.transactionDate DESC
+    """)
     List<Transaction> findByUserIdAndTransactionDateBetweenOrderByTransactionDateDesc(
-            Long userId, LocalDateTime from, LocalDateTime to);
+            @Param("userId") Long userId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to);
 
     @Query("""
         SELECT COALESCE(SUM(t.amount), 0)
@@ -95,12 +104,15 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     List<Transaction> findByUserIdOrderByTransactionDateDesc(Long userId);
 
-    // Последние N транзакций
     @Query("""
         SELECT t FROM Transaction t
+        LEFT JOIN FETCH t.category
+        LEFT JOIN FETCH t.account
         WHERE t.user.id = :userId
         ORDER BY t.transactionDate DESC
         LIMIT :limit
     """)
-    List<Transaction> findTopByUserId(@Param("userId") Long userId, @Param("limit") int limit);
+    List<Transaction> findTopByUserId(
+            @Param("userId") Long userId,
+            @Param("limit") int limit);
 }
