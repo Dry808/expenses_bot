@@ -1,7 +1,5 @@
 package com.expensebot.service;
 
-
-
 import com.expensebot.model.*;
 import com.expensebot.repository.AccountRepository;
 import com.expensebot.repository.BotUserRepository;
@@ -11,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.meta.api.objects.User;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -37,10 +36,10 @@ public class UserService {
     }
 
     private void createDefaults(BotUser user) {
-        // Счёт по умолчанию
+        // Явно задаём balance=ZERO — Lombok Builder не подставляет дефолты из поля
         var account = Account.builder()
                 .user(user).name("Основной").emoji("💰")
-                .currency("RUB").isDefault(true).build();
+                .currency("RUB").balance(BigDecimal.ZERO).isDefault(true).build();
         accountRepo.save(account);
 
         // Системные категории расходов
