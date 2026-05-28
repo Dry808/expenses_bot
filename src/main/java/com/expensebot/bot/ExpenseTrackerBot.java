@@ -44,7 +44,9 @@ public class ExpenseTrackerBot extends TelegramLongPollingBot {
                 if (resp != null) execute((BotApiMethod<?>) resp);
 
             // ── Данные из Mini App (WebApp) ────────────────────
-            } else if (update.hasMessage() && update.getMessage().hasWebAppData()) {
+            } else if (update.hasMessage()
+                    && update.getMessage().getWebAppData() != null
+                    && update.getMessage().getWebAppData().getData() != null) {
                 handleWebAppData(
                         update.getMessage().getChatId(),
                         update.getMessage().getWebAppData().getData()
