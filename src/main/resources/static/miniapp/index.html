@@ -539,7 +539,7 @@
   <!-- Header -->
   <div class="header">
     <div class="header-top">
-      <span class="header-title">Мой кошелёк</span>
+      <span class="header-title">MyWallet</span>
       <button class="header-bell" onclick="showToast('Уведомления')">
         <svg viewBox="0 0 24 24"><path d="M12 2C10.3 2 9 3.3 9 5c0 .3 0 .6.1.8C6.7 6.8 5 9.2 5 12v5l-1 1v1h16v-1l-1-1v-5c0-2.8-1.7-5.2-4.1-6.2.1-.2.1-.5.1-.8 0-1.7-1.3-3-3-3zm0 18c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2z"/></svg>
       </button>
@@ -785,30 +785,45 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
-// ── Данные ─────────────────────────────────────────────────────
+// ── Конфиг ─────────────────────────────────────────────────────
 const API_BASE = 'https://talented-elegance-production-202c.up.railway.app';
 
-// Демо-данные (пока API не подключён)
-let transactions = [
-  { id:1, type:'expense', amount:606, category:'🍕 Кафе и рестораны', account:'Карта', date:'2026-05-26', note:'' },
-  { id:2, type:'expense', amount:179.98, category:'🛒 Продукты', account:'Карта', date:'2026-05-26', note:'Пятёрочка' },
-  { id:3, type:'expense', amount:173.28, category:'🛒 Продукты', account:'Карта', date:'2026-05-18', note:'' },
-  { id:4, type:'expense', amount:179, category:'🍕 Кафе и рестораны', account:'Карта', date:'2026-05-18', note:'Обед' },
-  { id:5, type:'expense', amount:776, category:'💊 Здоровье', account:'Карта', date:'2026-05-16', note:'Аптека' },
-  { id:6, type:'expense', amount:174.98, category:'🛒 Продукты', account:'Карта', date:'2026-05-15', note:'' },
-  { id:7, type:'expense', amount:550, category:'🍕 Кафе и рестораны', account:'Карта', date:'2026-05-14', note:'Ужин' },
-  { id:8, type:'income', amount:85000, category:'💼 Зарплата', account:'Карта', date:'2026-05-10', note:'Основная' },
-  { id:9, type:'expense', amount:1200, category:'🚗 Транспорт', account:'Карта', date:'2026-05-09', note:'' },
-  { id:10, type:'expense', amount:3500, category:'👗 Одежда', account:'Карта', date:'2026-05-07', note:'H&M' },
-  { id:11, type:'income', amount:12000, category:'💸 Фриланс', account:'Карта', date:'2026-05-05', note:'' },
-  { id:12, type:'expense', amount:890, category:'📱 Связь', account:'Карта', date:'2026-05-03', note:'Тариф' },
-];
+// Глобальные данные — заполняются из API
+let transactions = [];
+let apiAccounts = [];
+let apiCategories = [];
 
 const expenseCategories = ['🛒 Продукты','🍕 Кафе и рестораны','🚗 Транспорт','💊 Здоровье','👗 Одежда','🎮 Развлечения','📱 Связь','🏠 Жильё','📚 Образование','✈️ Путешествия'];
 const incomeCategories = ['💼 Зарплата','💸 Фриланс','🎁 Подарок','📈 Инвестиции','🏦 Прочий доход'];
 
 let currentTxType = 'expense';
 let amountStr = '0';
+
+// ── API helper ─────────────────────────────────────────────────
+function getInitData() {
+  return (window.Telegram && window.Telegram.WebApp) ? Telegram.WebApp.initData : '';
+}
+
+async function apiFetch(path) {
+  const res = await fetch(API_BASE + '/api/miniapp' + path, {
+    headers: { 'X-Telegram-Init-Data': getInitData() }
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+async function apiPost(path, body) {
+  const res = await fetch(API_BASE + '/api/miniapp' + path, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Telegram-Init-Data': getInitData()
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
 
 // Инициализация Telegram Web App
 if (window.Telegram && window.Telegram.WebApp) {
@@ -845,13 +860,20 @@ function switchTab(tab) {
   if (tab === 'budget') renderBudget();
 }
 
-// ── Расчёт сводки ─────────────────────────────────────────────
+// ── Расчёт сводки из данных дашборда ─────────────────────────
+function calcSummaryFromData(income, expense, balance) {
+  document.getElementById('total-income').textContent = fmt(income) + ' ₽';
+  document.getElementById('total-expense').textContent = fmt(expense) + ' ₽';
+  document.getElementById('total-balance').textContent = fmt(balance);
+}
+
 function calcSummary() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  let income = 0, expense = 0;
+  let income = 0, expense = 0, balance = 0;
   transactions.forEach(tx => {
     const d = new Date(tx.date);
+    balance += tx.type === 'income' ? tx.amount : -tx.amount;
     if (d >= monthStart) {
       if (tx.type === 'income') income += tx.amount;
       else expense += tx.amount;
@@ -859,8 +881,6 @@ function calcSummary() {
   });
   document.getElementById('total-income').textContent = fmt(income) + ' ₽';
   document.getElementById('total-expense').textContent = fmt(expense) + ' ₽';
-  const balance = 626608.59 - expense + income;
-  document.getElementById('total-balance').textContent = fmt(balance);
 }
 
 // ── Последние транзакции ──────────────────────────────────────
@@ -1165,42 +1185,217 @@ function updateAmountDisplay() {
   document.getElementById('amount-display').textContent = amountStr;
 }
 
-function submitTransaction() {
+async function submitTransaction() {
   const amount = parseFloat(amountStr);
   if (!amount || amount <= 0) { showToast('Введите сумму'); return; }
-  const cat = document.getElementById('modal-category').value;
-  const accIdx = document.getElementById('modal-account').value;
-  const accNames = ['Карта', 'Вклад', 'Наличка'];
+
+  const catSelect = document.getElementById('modal-category');
+  const catId = catSelect.options[catSelect.selectedIndex]?.dataset?.id;
+  const catName = catSelect.value;
+  const accSelect = document.getElementById('modal-account');
+  const accId = accSelect.value;
   const note = document.getElementById('modal-note').value;
 
-  const newTx = {
-    id: Date.now(),
-    type: currentTxType,
-    amount,
-    category: cat,
-    account: accNames[accIdx],
-    date: new Date().toISOString().slice(0,10),
-    note
-  };
-  transactions.unshift(newTx);
+  // Закрываем модал сразу
   document.getElementById('modal-overlay').classList.remove('open');
-  calcSummary();
-  renderRecent();
-  chartsInit = false;
-  showToast(currentTxType === 'expense' ? '✅ Расход добавлен!' : '✅ Доход добавлен!');
 
-  // Отправляем в бот через Telegram WebApp
-  if (window.Telegram && window.Telegram.WebApp) {
-    const sign = currentTxType === 'expense' ? '➖' : '➕';
-    Telegram.WebApp.sendData(JSON.stringify({ type: currentTxType, amount, category: cat, note }));
+  try {
+    if (catId && accId) {
+      // Реальный API вызов
+      await apiPost('/transactions', {
+        type: currentTxType.toUpperCase(),
+        amount,
+        categoryId: parseInt(catId),
+        accountId: parseInt(accId),
+        note: note || null
+      });
+      showToast(currentTxType === 'expense' ? '✅ Расход сохранён!' : '✅ Доход сохранён!');
+      // Перезагружаем данные
+      await loadDashboard();
+    } else {
+      // Fallback — добавляем локально
+      transactions.unshift({
+        id: Date.now(), type: currentTxType, amount,
+        category: catName, account: accSelect.options[accSelect.selectedIndex]?.text || 'Счёт',
+        date: new Date().toISOString().slice(0,10), note
+      });
+      calcSummary();
+      renderRecent();
+      chartsInit = false;
+      showToast(currentTxType === 'expense' ? '✅ Расход добавлен!' : '✅ Доход добавлен!');
+    }
+  } catch(e) {
+    showToast('❌ Ошибка сохранения');
+    console.error(e);
   }
 }
 
 // ── Init ──────────────────────────────────────────────────────
-calcSummary();
-renderRecent();
-renderDonut();
-renderTrend();
+async function loadDashboard() {
+  try {
+    const data = await apiFetch('/dashboard');
+
+    // Баланс и сводка
+    calcSummaryFromData(data.monthIncome, data.monthExpense, data.totalBalance);
+
+    // Счета
+    apiAccounts = data.accounts || [];
+    renderAccountsFromApi(apiAccounts);
+
+    // Транзакции
+    transactions = (data.recentTransactions || []).map(t => ({
+      id: t.id,
+      type: t.type,
+      amount: parseFloat(t.amount),
+      category: (t.categoryEmoji || '💳') + ' ' + (t.categoryName || 'Прочее'),
+      categoryId: t.categoryId,
+      account: t.accountName,
+      accountId: t.accountId,
+      date: t.date ? t.date.slice(0,10) : new Date().toISOString().slice(0,10),
+      note: t.note || ''
+    }));
+    renderRecent();
+
+    // Категории для модала
+    const cats = await apiFetch('/categories');
+    apiCategories = cats || [];
+    updateCategorySelects();
+
+    // Счета в модале
+    updateAccountSelect(apiAccounts);
+
+    // Бюджеты
+    if (data.budgets && data.budgets.length > 0) {
+      renderBudgetsFromApi(data.budgets);
+    }
+
+    // Диаграмма расходов по категориям из API
+    if (data.expensesByCategory && data.expensesByCategory.length > 0) {
+      renderDonutFromApi(data.expensesByCategory);
+    } else {
+      renderDonut();
+    }
+
+    renderTrend();
+
+  } catch(e) {
+    console.warn('API недоступен, используем демо-данные:', e);
+    // Fallback на демо-данные
+    transactions = [
+      { id:1, type:'expense', amount:606, category:'🍕 Кафе и рестораны', account:'Карта', date:'2026-05-26', note:'' },
+      { id:2, type:'expense', amount:179.98, category:'🛒 Продукты', account:'Карта', date:'2026-05-26', note:'Пятёрочка' },
+      { id:3, type:'expense', amount:85000, category:'💼 Зарплата', account:'Карта', date:'2026-05-10', note:'' },
+    ];
+    calcSummary();
+    renderRecent();
+    renderDonut();
+    renderTrend();
+  }
+}
+
+function renderAccountsFromApi(accounts) {
+  const colors = ['blue','green-dark','green'];
+  const list = document.getElementById('accounts-list');
+  if (!accounts || accounts.length === 0) return;
+  list.innerHTML = accounts.map((a, i) => `
+    <div class="account-card ${colors[i % colors.length]}">
+      <div class="account-name">${a.emoji} ${a.name}</div>
+      <div class="account-balance">${fmt(a.balance)} ${a.currency === 'RUB' ? '₽' : a.currency}</div>
+      <div class="account-currency">${a.currency}</div>
+      ${a.default ? '<div class="account-star">⭐</div>' : ''}
+    </div>
+  `).join('');
+}
+
+function updateCategorySelects() {
+  const expCats = apiCategories.filter(c => c.type === 'expense');
+  const incCats = apiCategories.filter(c => c.type === 'income');
+  window._expCats = expCats;
+  window._incCats = incCats;
+  // Обновляем текущий селект
+  const type = currentTxType;
+  const cats = type === 'expense' ? expCats : incCats;
+  const sel = document.getElementById('modal-category');
+  if (cats.length > 0) {
+    sel.innerHTML = cats.map(c =>
+      `<option value="${c.emoji} ${c.name}" data-id="${c.id}">${c.emoji} ${c.name}</option>`
+    ).join('');
+  }
+}
+
+function updateAccountSelect(accounts) {
+  const sel = document.getElementById('modal-account');
+  if (!accounts || accounts.length === 0) return;
+  sel.innerHTML = accounts.map(a =>
+    `<option value="${a.id}">${a.emoji} ${a.name}</option>`
+  ).join('');
+}
+
+function renderBudgetsFromApi(budgets) {
+  const list = document.getElementById('budget-list');
+  list.innerHTML = budgets.map(b => {
+    const pct = b.spentPercent || 0;
+    const cls = pct > 90 ? 'danger' : pct > 70 ? 'warn' : 'ok';
+    return `<div class="budget-card">
+      <div class="budget-header">
+        <div>
+          <div class="budget-name">${b.name || 'Бюджет'}</div>
+        </div>
+        <div class="budget-pct ${cls}">${Math.round(pct)}%</div>
+      </div>
+      <div class="progress-bg"><div class="progress-fill ${cls}" style="width:${Math.min(pct,100)}%"></div></div>
+      <div class="budget-nums">
+        <span class="budget-spent">Потрачено: ${fmt(b.spent)} ₽</span>
+        <span class="budget-left ${cls}">Остаток: ${fmt(b.left)} ₽</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderDonutFromApi(catStats) {
+  const colors = ['#3ab07a','#e05252','#f59e0b','#4a90d9','#9b59b6','#6b7280'];
+  const top = catStats.slice(0, 6);
+  new Chart(document.getElementById('donutChart'), {
+    type: 'doughnut',
+    data: {
+      labels: top.map(c => c.name),
+      datasets: [{ data: top.map(c => parseFloat(c.total)), backgroundColor: colors, borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true, cutout: '68%',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmt(ctx.raw) + ' ₽' } } }
+    }
+  });
+  document.getElementById('donut-legend').innerHTML = top.map((c, i) =>
+    `<span class="legend-item"><span class="legend-dot" style="background:${colors[i]}"></span>${c.name}</span>`
+  ).join('');
+}
+
+// Переопределяем setTxType чтобы использовал API категории
+const _origSetTxType = setTxType;
+function setTxType(type) {
+  currentTxType = type;
+  document.getElementById('btn-expense').classList.toggle('active', type === 'expense');
+  document.getElementById('btn-income').classList.toggle('active', type === 'income');
+  document.getElementById('modal-submit').textContent = type === 'expense' ? '✅ Добавить расход' : '✅ Добавить доход';
+
+  const apiCats = type === 'expense'
+    ? (window._expCats || [])
+    : (window._incCats || []);
+
+  const sel = document.getElementById('modal-category');
+  if (apiCats.length > 0) {
+    sel.innerHTML = apiCats.map(c =>
+      `<option value="${c.emoji} ${c.name}" data-id="${c.id}">${c.emoji} ${c.name}</option>`
+    ).join('');
+  } else {
+    // fallback на статические категории
+    const cats = type === 'expense' ? expenseCategories : incomeCategories;
+    sel.innerHTML = cats.map(c => `<option>${c}</option>`).join('');
+  }
+}
+
+loadDashboard();
 </script>
 </body>
 </html>
