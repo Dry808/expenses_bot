@@ -539,7 +539,7 @@
   <!-- Header -->
   <div class="header">
     <div class="header-top">
-      <span class="header-title">MyWallet</span>
+      <span class="header-title">Мой кошелёк</span>
       <button class="header-bell" onclick="showToast('Уведомления')">
         <svg viewBox="0 0 24 24"><path d="M12 2C10.3 2 9 3.3 9 5c0 .3 0 .6.1.8C6.7 6.8 5 9.2 5 12v5l-1 1v1h16v-1l-1-1v-5c0-2.8-1.7-5.2-4.1-6.2.1-.2.1-.5.1-.8 0-1.7-1.3-3-3-3zm0 18c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2z"/></svg>
       </button>
@@ -1279,16 +1279,12 @@ async function loadDashboard() {
     renderTrend();
 
   } catch(e) {
-    console.warn('API недоступен, используем демо-данные:', e);
-    // Fallback на демо-данные
-    transactions = [
-      { id:1, type:'expense', amount:606, category:'🍕 Кафе и рестораны', account:'Карта', date:'2026-05-26', note:'' },
-      { id:2, type:'expense', amount:179.98, category:'🛒 Продукты', account:'Карта', date:'2026-05-26', note:'Пятёрочка' },
-      { id:3, type:'expense', amount:85000, category:'💼 Зарплата', account:'Карта', date:'2026-05-10', note:'' },
-    ];
-    calcSummary();
-    renderRecent();
-    renderDonut();
+    console.error('Ошибка загрузки данных:', e);
+    document.getElementById('total-balance').textContent = '—';
+    document.getElementById('total-income').textContent = '— ₽';
+    document.getElementById('total-expense').textContent = '— ₽';
+    document.getElementById('recent-list').innerHTML =
+      '<div style="text-align:center;padding:30px;color:var(--text2);font-weight:700;">Не удалось загрузить данные.<br>Попробуйте позже.</div>';
     renderTrend();
   }
 }
