@@ -875,12 +875,12 @@ function updateCategorySelect(type) {
   const cats = allCategories.filter(c => c.type === type);
   const sel = document.getElementById('modal-category');
   if (cats.length > 0) {
-    sel.innerHTML = cats.map(c => `<option value="${c.id}" data-name="${c.emoji} ${c.name}">${c.emoji} ${c.name}</option>`).join('');
+    // value = id категории, текст = emoji + name
+    sel.innerHTML = cats.map(c =>
+      `<option value="${c.id}" data-emoji="${c.emoji}" data-name="${c.name}">${c.emoji} ${c.name}</option>`
+    ).join('');
   } else {
-    const defaults = type==='expense'
-      ? ['🛒 Продукты','🍕 Кафе','🚗 Транспорт','💊 Здоровье']
-      : ['💼 Зарплата','💸 Фриланс'];
-    sel.innerHTML = defaults.map(c => `<option>${c}</option>`).join('');
+    sel.innerHTML = '<option value="">Нет категорий — создайте в боте</option>';
   }
 }
 function updateAccountSelect(accounts) {
@@ -906,11 +906,16 @@ async function submitTransaction() {
   if (!amount || amount <= 0) { showToast('Введите сумму'); return; }
 
   const catSel = document.getElementById('modal-category');
-  const catId = parseInt(catSel.value);
-  const catName = catSel.options[catSel.selectedIndex]?.dataset?.name || catSel.value;
+  const catId = catSel.value ? parseInt(catSel.value) : null;
+  const catOpt = catSel.options[catSel.selectedIndex];
+  const catEmoji = catOpt?.dataset?.emoji || '';
+  const catName = catOpt ? (catEmoji + ' ' + (catOpt.dataset?.name || catOpt.text)) : catSel.value;
   const accSel = document.getElementById('modal-account');
-  const accId = parseInt(accSel.value);
+  const accId = accSel.value ? parseInt(accSel.value) : null;
   const accName = accSel.options[accSel.selectedIndex]?.text || '';
+
+  if (!catId) { showToast('Выберите категорию'); return; }
+  if (!accId) { showToast('Выберите счёт'); return; }
   const note = document.getElementById('modal-note').value.trim();
 
   const btn = document.getElementById('modal-submit');

@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -125,8 +126,17 @@ public class MiniAppController {
         if (user == null) return ResponseEntity.status(401).build();
 
         try {
+            if (req.categoryId() == null) {
+                log.error("categoryId is null in request: {}", req);
+                return ResponseEntity.badRequest().build();
+            }
+            if (req.accountId() == null) {
+                log.error("accountId is null in request: {}", req);
+                return ResponseEntity.badRequest().build();
+            }
+
             var category = categoryService.findById(req.categoryId())
-                    .orElseThrow(() -> new IllegalArgumentException("Category not found"));
+                    .orElseThrow(() -> new IllegalArgumentException("Category not found: " + req.categoryId()));
 
             var tx = txService.addWithCategory(
                     user.getId(), req.accountId(), category,
@@ -134,7 +144,7 @@ public class MiniAppController {
             );
             return ResponseEntity.ok(TransactionDto.from(tx));
         } catch (Exception e) {
-            log.error("Add transaction error", e);
+            log.error("Add transaction error: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -201,7 +211,7 @@ public class MiniAppController {
                 new CategoryStatDto((String)r[1], (String)r[2], (BigDecimal)r[3])).toList();
 
         List<WeeklyStatDto> weeklyStat = weekly.stream().map(r -> new WeeklyStatDto(
-                ((java.sql.Timestamp) r[0]).toLocalDateTime(),
+                ((java.sql.Timestamp) r[0]).toLocalDateTime().toString().substring(0, 10),
                 (BigDecimal) r[1], (BigDecimal) r[2]
         )).toList();
 
@@ -252,8 +262,11 @@ public class MiniAppController {
 
     public record TransactionDto(Long id, String type, BigDecimal amount, String categoryName,
                                  String categoryEmoji, Long categoryId, Long accountId,
-                                 String accountName, String note, LocalDateTime date) {
+                                 String accountName, String note, String date) {
         static TransactionDto from(Transaction t) {
+            String dateStr = t.getTransactionDate() != null
+                    ? t.getTransactionDate().toString().substring(0, 10)
+                    : "";
             return new TransactionDto(
                     t.getId(), t.getType().name().toLowerCase(),
                     t.getAmount(),
@@ -261,7 +274,7 @@ public class MiniAppController {
                     t.getCategory() != null ? t.getCategory().getEmoji() : null,
                     t.getCategory() != null ? t.getCategory().getId() : null,
                     t.getAccount().getId(), t.getAccount().getName(),
-                    t.getNote(), t.getTransactionDate()
+                    t.getNote(), dateStr
             );
         }
     }
@@ -273,7 +286,7 @@ public class MiniAppController {
     }
 
     public record CategoryStatDto(String name, String emoji, BigDecimal total) {}
-    public record WeeklyStatDto(LocalDateTime week, BigDecimal income, BigDecimal expense) {}
+    public record WeeklyStatDto(String week, BigDecimal income, BigDecimal expense) {}
     public record MonthlyStatDto(int month, BigDecimal income, BigDecimal expense) {}
     public record BudgetStatusDto(Long id, String name, BigDecimal total, BigDecimal spent,
                                   BigDecimal left, double spentPercent, int daysLeft, BigDecimal dailyRecommended) {}
