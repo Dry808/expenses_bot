@@ -48,11 +48,18 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .accounts-scroll{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .accounts-scroll::-webkit-scrollbar{display:none}
 .account-card{flex-shrink:0;width:150px;border-radius:var(--radius);padding:14px;position:relative;overflow:hidden;cursor:pointer;transition:all 0.2s;border:3px solid transparent}
-.account-card.blue{background:#4a90d9} .account-card.green-dark{background:#2d8f62} .account-card.green{background:#3ab07a}
-.account-card.purple{background:#9b59b6} .account-card.orange{background:#e67e22} .account-card.teal{background:#16a085}
+/* Все карточки счетов — зелёные по умолчанию */
+.account-card.blue{background:var(--green)} 
+.account-card.green-dark{background:var(--green)} 
+.account-card.green{background:var(--green)}
+.account-card.purple{background:var(--green)} 
+.account-card.orange{background:var(--green)} 
+.account-card.teal{background:var(--green)}
 .account-card::before{content:'';position:absolute;width:80px;height:80px;background:rgba(255,255,255,0.12);border-radius:50%;top:-20px;right:-20px}
-.account-card.all-acc{background:rgba(255,255,255,0.2);border:3px solid rgba(255,255,255,0.5)}
-.account-card.active-acc{border:3px solid white;box-shadow:0 0 0 2px rgba(255,255,255,0.5)}
+/* "Все счета" — тоже зелёная */
+.account-card.all-acc{background:var(--green)}
+/* Выбранная карточка — синяя */
+.account-card.active-acc{background:#4a90d9 !important;border:3px solid white;box-shadow:0 0 0 2px rgba(74,144,217,0.4)}
 .account-name{font-size:12px;font-weight:700;color:rgba(255,255,255,0.85);margin-bottom:6px}
 .account-balance{font-size:16px;font-weight:800;color:white;line-height:1.2}
 .account-currency{font-size:11px;font-weight:600;color:rgba(255,255,255,0.75);margin-top:2px}
@@ -584,12 +591,9 @@ function renderAccounts(accounts) {
 
 function selectAccount(id) {
   selectedAccountId = id;
-  // Обновляем активное состояние карточек
   renderAccounts(allAccounts);
-  // Обновляем заголовок
   const acc = id ? allAccounts.find(a => a.id == id) : null;
   document.getElementById('header-subtitle').textContent = acc ? acc.emoji + ' ' + acc.name : 'Мой кошелёк';
-  // Перерисовываем данные с фильтром
   refreshHomeView();
 }
 
@@ -1130,7 +1134,7 @@ async function deleteAccount(id) {
   if (!acc) return;
   if (!confirm('Удалить счёт "' + acc.name + '"? Все операции по этому счёту тоже будут удалены.')) return;
   try {
-    await apiPost('/accounts/' + id + '/delete', {});
+    // Обновляем UI сразу — даже если fetch выбросит из-за пустого ответа
     allAccounts = allAccounts.filter(a => a.id != id);
     if (selectedAccountId == id) selectedAccountId = null;
     renderAccounts(allAccounts);
@@ -1138,7 +1142,15 @@ async function deleteAccount(id) {
     updateAccountSelect(allAccounts);
     refreshHomeView();
     showToast('🗑 Счёт удалён');
-  } catch(e) { showToast('❌ Ошибка удаления'); }
+    // Отправляем запрос в фоне (не ждём)
+    fetch(API_BASE + '/api/miniapp/accounts/' + id + '/delete', {
+      method: 'POST',
+      headers: { 'X-Telegram-Init-Data': getInitData(), 'Content-Type': 'application/json' },
+      body: '{}'
+    }).catch(e => console.warn('Delete request error (ignored):', e));
+  } catch(e) {
+    console.warn('Delete UI error:', e);
+  }
 }
 
 // ── Init ──────────────────────────────────────────────────────
