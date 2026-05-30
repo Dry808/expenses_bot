@@ -35,14 +35,24 @@ public class TelegramAuthService {
      * либо null если данные невалидны или устарели (> 24ч).
      */
     public Long validateAndGetUserId(String initData) {
-        if (initData == null || initData.isBlank()) return null;
+        if (initData == null || initData.isBlank()) {
+            log.warn("initData is empty");
+            return null;
+        }
+
+        // ── Логируем первые символы для отладки
+        log.info("initData preview: {}", initData.substring(0, Math.min(80, initData.length())));
 
         try {
             // Разбираем query-string
             Map<String, String> params = parseQueryString(initData);
+            log.info("parsed params keys: {}", params.keySet());
 
             String receivedHash = params.remove("hash");
-            if (receivedHash == null) return null;
+            if (receivedHash == null) {
+                log.warn("No hash field in initData");
+                return null;
+            }
 
             // Проверяем свежесть (не старше 24 часов)
             String authDateStr = params.get("auth_date");
@@ -70,8 +80,10 @@ public class TelegramAuthService {
                     dataCheckString.getBytes(StandardCharsets.UTF_8));
             String expectedHash = bytesToHex(expectedHashBytes);
 
+            log.info("Expected hash: {}", expectedHash);
+            log.info("Received hash: {}", receivedHash);
             if (!expectedHash.equalsIgnoreCase(receivedHash)) {
-                log.warn("Telegram initData hash mismatch");
+                log.warn("Telegram initData hash mismatch! Expected={} Received={}", expectedHash, receivedHash);
                 return null;
             }
 
