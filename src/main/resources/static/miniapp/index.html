@@ -193,7 +193,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
   <div class="section">
     <div class="section-header">
       <span class="section-title">Счета</span>
-      <span class="section-link" onclick="switchTab('records')">История →</span>
+      <span class="section-link" onclick="switchTab('accounts')">Управление →</span>
     </div>
     <div class="accounts-scroll" id="accounts-list">
       <div class="loading"><div class="spinner"></div>Загрузка...</div>
@@ -282,6 +282,19 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
   </div>
 </div>
 
+<!-- ACCOUNTS PAGE -->
+<div id="page-accounts" class="page">
+  <div class="header" style="padding-bottom:20px">
+    <div class="header-top">
+      <span class="header-title">Управление счетами</span>
+      <button onclick="openAccountModal()" style="background:rgba(255,255,255,0.2);border:none;border-radius:20px;color:white;font-family:Nunito,sans-serif;font-weight:700;font-size:13px;padding:6px 14px;cursor:pointer">+ Новый</button>
+    </div>
+  </div>
+  <div style="padding:16px">
+    <div id="accounts-manage-list"><div class="loading"><div class="spinner"></div>Загрузка...</div></div>
+  </div>
+</div>
+
 <!-- BUDGET PAGE -->
 <div id="page-budget" class="page">
   <div class="header" style="padding-bottom:20px">
@@ -305,6 +318,10 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
   <button class="nav-item" id="nav-analytics" onclick="switchTab('analytics')">
     <div class="nav-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-4"/></svg></div>
     <span class="nav-label">Аналитика</span>
+  </button>
+  <button class="nav-item" id="nav-accounts" onclick="switchTab('accounts')">
+    <div class="nav-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+    <span class="nav-label">Счета</span>
   </button>
   <button class="nav-item" id="nav-budget" onclick="switchTab('budget')">
     <div class="nav-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg></div>
@@ -348,6 +365,34 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
     <div class="modal-label">Заметка</div>
     <input class="modal-input" type="text" id="modal-note" placeholder="Необязательно">
     <button class="submit-btn" id="modal-submit" onclick="submitTransaction()">✅ Добавить расход</button>
+  </div>
+</div>
+
+<!-- Account Modal -->
+<div class="modal-overlay" id="acc-modal-overlay" onclick="closeAccModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="acc-modal-title">Новый счёт</div>
+
+    <div class="modal-label">Название счёта</div>
+    <input class="modal-input" type="text" id="acc-name" placeholder="Например: Карта, Наличные...">
+
+    <div class="modal-label">Эмодзи</div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px" id="emoji-picker">
+    </div>
+    <input class="modal-input" type="text" id="acc-emoji" placeholder="Или введите свой эмодзи" maxlength="4">
+
+    <div class="modal-label">Валюта</div>
+    <select class="modal-select" id="acc-currency">
+      <option value="RUB">🇷🇺 RUB — Рубль</option>
+      <option value="USD">🇺🇸 USD — Доллар</option>
+      <option value="EUR">🇪🇺 EUR — Евро</option>
+      <option value="GBP">🇬🇧 GBP — Фунт</option>
+      <option value="KZT">🇰🇿 KZT — Тенге</option>
+      <option value="BYN">🇧🇾 BYN — Белорусский рубль</option>
+    </select>
+
+    <button class="submit-btn" id="acc-submit-btn" onclick="submitAccount()">✅ Создать счёт</button>
   </div>
 </div>
 
@@ -408,16 +453,7 @@ async function apiPost(path, body) {
   return res.json();
 }
 
-// ── Navigation ────────────────────────────────────────────────
-function switchTab(tab) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('page-' + tab).classList.add('active');
-  document.getElementById('nav-' + tab).classList.add('active');
-  if (tab === 'analytics') renderAnalytics();
-  if (tab === 'records') renderRecords();
-  if (tab === 'budget') renderBudget();
-}
+// ── Navigation — moved to Accounts Management section ────────
 
 // ── Filtered transactions by selected account ─────────────────
 function getFilteredTx() {
@@ -523,10 +559,11 @@ function renderAccounts(accounts) {
   }
 
   // "Все счета" карточка + карточки счетов
+  const totalBal = accounts.reduce((s,a) => s + parseFloat(a.balance||0), 0);
   let html = `<div class="account-card all-acc ${!selectedAccountId ? 'active-acc' : ''}" onclick="selectAccount(null)">
-    <div class="account-name">Все счета</div>
-    <div class="account-balance">${fmt(accounts.reduce((s,a) => s + parseFloat(a.balance||0), 0))} ₽</div>
-    <div class="account-currency">RUB</div>
+    <div class="account-name" style="font-size:13px;color:rgba(255,255,255,0.9)">💼 Все счета</div>
+    <div class="account-balance" style="font-size:18px">${fmt(totalBal)} ₽</div>
+    <div class="account-currency">Общий баланс</div>
   </div>`;
 
   accounts.forEach((a, i) => {
@@ -957,6 +994,151 @@ async function submitTransaction() {
     btn.disabled = false;
     setTxType(currentTxType);
   }
+}
+
+// ── Accounts Management ──────────────────────────────────────
+const ACCOUNT_EMOJIS = ['💳','💵','💴','💶','🏦','💰','🪙','💎','🏧','📱','💼','🏠','🚗','✈️','🎯','💹'];
+let editingAccountId = null;
+
+function switchTab(tab) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  const navEl = document.getElementById('nav-' + tab);
+  if (navEl) navEl.classList.add('active');
+  if (tab === 'analytics') renderAnalytics();
+  if (tab === 'records') renderRecords();
+  if (tab === 'budget') renderBudget();
+  if (tab === 'accounts') renderAccountsManage();
+}
+
+function renderAccountsManage() {
+  const list = document.getElementById('accounts-manage-list');
+  if (!allAccounts || allAccounts.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text2);font-size:13px;font-weight:700">Счетов пока нет.<br>Создайте первый!</div>';
+    return;
+  }
+  list.innerHTML = allAccounts.map(a => {
+    const bal = parseFloat(a.balance || 0);
+    const cur = a.currency === 'RUB' ? '₽' : a.currency;
+    return `<div class="budget-card" style="display:flex;align-items:center;gap:12px">
+      <div style="width:48px;height:48px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">${a.emoji}</div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:800">${a.name} ${a.isDefault ? '⭐' : ''}</div>
+        <div style="font-size:13px;color:var(--text2);font-weight:600">${a.currency}</div>
+        <div style="font-size:17px;font-weight:800;color:var(--green);margin-top:2px">${fmt(bal)} ${cur}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${!a.isDefault ? `<button onclick="setDefaultAccount(${a.id})" style="background:var(--blue-light);color:var(--blue);border:none;border-radius:8px;padding:6px 10px;font-family:Nunito,sans-serif;font-weight:700;font-size:11px;cursor:pointer">⭐ Основной</button>` : ''}
+        <button onclick="openEditAccount(${a.id})" style="background:var(--green-light);color:var(--green);border:none;border-radius:8px;padding:6px 10px;font-family:Nunito,sans-serif;font-weight:700;font-size:11px;cursor:pointer">✏️ Изменить</button>
+        ${!a.isDefault ? `<button onclick="deleteAccount(${a.id})" style="background:var(--red-light);color:var(--red);border:none;border-radius:8px;padding:6px 10px;font-family:Nunito,sans-serif;font-weight:700;font-size:11px;cursor:pointer">🗑 Удалить</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openAccountModal(editId) {
+  editingAccountId = editId || null;
+  document.getElementById('acc-modal-title').textContent = editId ? 'Редактировать счёт' : 'Новый счёт';
+  document.getElementById('acc-submit-btn').textContent = editId ? '✅ Сохранить' : '✅ Создать счёт';
+
+  // Emoji picker
+  document.getElementById('emoji-picker').innerHTML = ACCOUNT_EMOJIS.map(e =>
+    `<button onclick="selectEmoji('${e}')" style="font-size:22px;background:var(--bg);border:2px solid transparent;border-radius:8px;padding:4px;cursor:pointer;transition:all 0.1s" id="emoji-${e}">${e}</button>`
+  ).join('');
+
+  if (editId) {
+    const acc = allAccounts.find(a => a.id == editId);
+    if (acc) {
+      document.getElementById('acc-name').value = acc.name;
+      document.getElementById('acc-emoji').value = acc.emoji;
+      document.getElementById('acc-currency').value = acc.currency;
+      selectEmoji(acc.emoji);
+    }
+  } else {
+    document.getElementById('acc-name').value = '';
+    document.getElementById('acc-emoji').value = '💳';
+    document.getElementById('acc-currency').value = 'RUB';
+    selectEmoji('💳');
+  }
+  document.getElementById('acc-modal-overlay').classList.add('open');
+}
+
+function openEditAccount(id) { openAccountModal(id); }
+
+function selectEmoji(e) {
+  document.getElementById('acc-emoji').value = e;
+  document.querySelectorAll('#emoji-picker button').forEach(btn => {
+    btn.style.borderColor = 'transparent';
+    btn.style.background = 'var(--bg)';
+  });
+  const btn = document.getElementById('emoji-' + e);
+  if (btn) { btn.style.borderColor = 'var(--green)'; btn.style.background = 'var(--green-light)'; }
+}
+
+function closeAccModal(e) {
+  if (e.target === document.getElementById('acc-modal-overlay'))
+    document.getElementById('acc-modal-overlay').classList.remove('open');
+}
+
+async function submitAccount() {
+  const name = document.getElementById('acc-name').value.trim();
+  const emoji = document.getElementById('acc-emoji').value.trim() || '💳';
+  const currency = document.getElementById('acc-currency').value;
+
+  if (!name) { showToast('Введите название счёта'); return; }
+
+  const btn = document.getElementById('acc-submit-btn');
+  btn.disabled = true; btn.textContent = '⏳ Сохранение...';
+
+  try {
+    if (editingAccountId) {
+      await apiPost('/accounts/' + editingAccountId + '/update', { name, emoji, currency });
+      const acc = allAccounts.find(a => a.id == editingAccountId);
+      if (acc) { acc.name = name; acc.emoji = emoji; acc.currency = currency; }
+      showToast('✅ Счёт обновлён!');
+    } else {
+      const newAcc = await apiPost('/accounts', { name, emoji, currency });
+      if (newAcc) allAccounts.push(newAcc);
+      showToast('✅ Счёт создан!');
+    }
+    document.getElementById('acc-modal-overlay').classList.remove('open');
+    renderAccounts(allAccounts);
+    renderAccountsManage();
+    updateAccountSelect(allAccounts);
+  } catch(e) {
+    showToast('❌ Ошибка. Попробуйте снова.');
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = editingAccountId ? '✅ Сохранить' : '✅ Создать счёт';
+  }
+}
+
+async function setDefaultAccount(id) {
+  try {
+    await apiPost('/accounts/' + id + '/default', {});
+    allAccounts.forEach(a => a.isDefault = (a.id == id));
+    renderAccounts(allAccounts);
+    renderAccountsManage();
+    showToast('⭐ Основной счёт изменён!');
+  } catch(e) { showToast('❌ Ошибка'); }
+}
+
+async function deleteAccount(id) {
+  const acc = allAccounts.find(a => a.id == id);
+  if (!acc) return;
+  if (!confirm('Удалить счёт "' + acc.name + '"? Все операции по этому счёту тоже будут удалены.')) return;
+  try {
+    await apiPost('/accounts/' + id + '/delete', {});
+    allAccounts = allAccounts.filter(a => a.id != id);
+    if (selectedAccountId == id) selectedAccountId = null;
+    renderAccounts(allAccounts);
+    renderAccountsManage();
+    updateAccountSelect(allAccounts);
+    refreshHomeView();
+    showToast('🗑 Счёт удалён');
+  } catch(e) { showToast('❌ Ошибка удаления'); }
 }
 
 // ── Init ──────────────────────────────────────────────────────

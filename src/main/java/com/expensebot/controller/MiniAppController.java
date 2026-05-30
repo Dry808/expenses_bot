@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -161,6 +162,84 @@ public class MiniAppController {
         );
     }
 
+    // ── Create account ─────────────────────────────────────────
+    @PostMapping("/accounts")
+    public ResponseEntity<AccountDto> createAccount(
+            @RequestHeader("X-Telegram-Init-Data") String initData,
+            @RequestBody AccountRequest req) {
+        var user = authenticate(initData);
+        if (user == null) return ResponseEntity.status(401).build();
+        try {
+            var acc = accountService.create(user.getId(),
+                    req.name(), req.emoji() != null ? req.emoji() : "💳",
+                    req.currency() != null ? req.currency() : "RUB");
+            return ResponseEntity.ok(AccountDto.from(acc));
+        } catch (Exception e) {
+            log.error("Create account error", e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // ── Update account ─────────────────────────────────────────
+    @Transactional
+    @PostMapping("/accounts/{id}/update")
+    public ResponseEntity<Void> updateAccount(
+            @RequestHeader("X-Telegram-Init-Data") String initData,
+            @PathVariable Long id,
+            @RequestBody AccountRequest req) {
+        var user = authenticate(initData);
+        if (user == null) return ResponseEntity.status(401).build();
+        try {
+            accountService.findById(id).ifPresent(acc -> {
+                if (!acc.getUser().getId().equals(user.getId())) return;
+                if (req.name() != null) acc.setName(req.name());
+                if (req.emoji() != null) acc.setEmoji(req.emoji());
+                if (req.currency() != null) acc.setCurrency(req.currency());
+            });
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Update account error", e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // ── Set default account ────────────────────────────────────
+    @PostMapping("/accounts/{id}/default")
+    public ResponseEntity<Void> setDefaultAccount(
+            @RequestHeader("X-Telegram-Init-Data") String initData,
+            @PathVariable Long id) {
+        var user = authenticate(initData);
+        if (user == null) return ResponseEntity.status(401).build();
+        try {
+            accountService.setDefault(id, user.getId());
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Set default account error", e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // ── Delete account ─────────────────────────────────────────
+    @PostMapping("/accounts/{id}/delete")
+    public ResponseEntity<Void> deleteAccount(
+            @RequestHeader("X-Telegram-Init-Data") String initData,
+            @PathVariable Long id) {
+        var user = authenticate(initData);
+        if (user == null) return ResponseEntity.status(401).build();
+        try {
+            var acc = accountService.findById(id).orElse(null);
+            if (acc == null || !acc.getUser().getId().equals(user.getId()))
+                return ResponseEntity.status(403).build();
+            if (acc.isDefault())
+                return ResponseEntity.badRequest().build(); // нельзя удалить основной
+            accountService.delete(id);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Delete account error", e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     // ── Categories ─────────────────────────────────────────────
     @GetMapping("/categories")
     public ResponseEntity<List<CategoryDto>> getCategories(
@@ -297,4 +376,6 @@ public class MiniAppController {
     public record AnalyticsResponse(BigDecimal income, BigDecimal expense, BigDecimal balance,
                                     List<CategoryStatDto> expenseCategories, List<CategoryStatDto> incomeCategories,
                                     List<WeeklyStatDto> weekly, List<MonthlyStatDto> monthly) {}
+
+    public record AccountRequest(String name, String emoji, String currency) {}
 }
